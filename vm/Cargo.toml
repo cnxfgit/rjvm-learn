@@ -1,0 +1,11 @@
+[package]
+name = "rjvm_vm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rjvm_reader = { path = "../reader" }
+thiserror = "1"
+log = "0.4.17"
+typed-arena = "2.0.2"
+bitfield-struct = "0.4.4"

@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "reader",
+    "vm",
+    "vm_cli"
+]
