@@ -116,6 +116,12 @@ impl<'a> AbstractObject<'a> {
     }
 }
 
+impl<'a> Object<'a> for AbstractObject<'a> {
+    fn class_id(&self) -> ClassId {
+        self.object_header().class_id
+    }
+}
+
 // As arrays
 
 impl<'a> AbstractObject<'a> {
@@ -135,12 +141,6 @@ impl<'a> Array<'a> for AbstractObject<'a> {
 
     fn len(&self) -> u32 {
         self.array_header().length
-    }
-}
-
-impl<'a> Object<'a> for AbstractObject<'a> {
-    fn class_id(&self) -> ClassId {
-        self.object_header().class_id
     }
 }
 
