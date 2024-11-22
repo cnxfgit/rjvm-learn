@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-use crate::constant_pool::InvalidConstantPoolIndexError;
+use crate::{buffer::BufferError, constant_pool::InvalidConstantPoolIndexError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ClassReaderError {
@@ -39,6 +39,27 @@ impl Error for ClassReaderError {
         match self {
             ClassReaderError::InvalidClassData(_, Some(source)) => Some(source),
             _ => None,
+        }
+    }
+}
+
+pub type Result<T> = std::result::Result<T, ClassReaderError>;
+
+impl From<InvalidConstantPoolIndexError> for ClassReaderError {
+    fn from(err: InvalidConstantPoolIndexError) -> Self {
+        Self::InvalidClassData(err.to_string(), Some(err))
+    }
+}
+
+impl From<BufferError> for ClassReaderError {
+    fn from(err: BufferError) -> Self {
+        match err {
+            BufferError::UnexpectedEndOfData => {
+                Self::invalid_class_data("unexpected end of class fill".to_string())
+            }
+            BufferError::InvalidCesu8String => {
+                Self::invalid_class_data("invalid cesu8 string".to_string())
+            }
         }
     }
 }

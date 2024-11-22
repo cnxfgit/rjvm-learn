@@ -1,6 +1,11 @@
 use std::cmp::Ordering;
 
-use crate::{line_number::LineNumber, program_counter::ProgramCounter};
+use itertools::Itertools;
+
+use crate::{
+    line_number::LineNumber,
+    program_counter::ProgramCounter,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct LineNumberTable {
@@ -20,6 +25,14 @@ impl LineNumberTable {
     }
 }
 
+impl LineNumberTable {
+    pub fn new(entries: Vec<LineNumberTableEntry>) -> Self {
+        Self {
+            entries: entries.into_iter().sorted().collect(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LineNumberTableEntry {
     pub program_counter: ProgramCounter,
@@ -35,5 +48,14 @@ impl PartialOrd for LineNumberTableEntry {
 impl Ord for LineNumberTableEntry {
     fn cmp(&self, other: &Self) -> Ordering {
         self.program_counter.cmp(&other.program_counter)
+    }
+}
+
+impl LineNumberTableEntry {
+    pub fn new(program_counter: ProgramCounter, line_number: LineNumber) -> Self {
+        Self {
+            program_counter,
+            line_number,
+        }
     }
 }

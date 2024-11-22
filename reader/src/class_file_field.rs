@@ -7,7 +7,7 @@ pub struct ClassFileField {
     pub name: String,
     pub type_descriptor: FieldType,
     pub constant_value: Option<FieldConstantValue>,
-    pub deprecate: bool,
+    pub deprecated: bool,
 }
 
 

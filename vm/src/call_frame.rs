@@ -7,7 +7,16 @@ use rjvm_reader::{
 };
 
 use crate::{
-    call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod}, call_stack::{self, CallStack}, class_and_method::ClassAndMethod, exception::{self, JavaException, MethodCallFailed}, object::Object, stack_trace_element::StackTraceElement, value::Value, value_stack::ValueStack, vm::Vm, vm_error::VmError
+    call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
+    call_stack::{self, CallStack},
+    class_and_method::ClassAndMethod,
+    exception::{self, JavaException, MethodCallFailed},
+    object::Object,
+    stack_trace_element::StackTraceElement,
+    value::Value,
+    value_stack::ValueStack,
+    vm::Vm,
+    vm_error::VmError,
 };
 
 pub type MethodCallResult<'a> = Result<Option<Value<'a>>, MethodCallFailed<'a>>;
@@ -84,7 +93,7 @@ impl<'a> CallFrame<'a> {
                             return Err(MethodCallFailed::ExceptionThrown(exception));
                         }
                         Ok(Some(catch_handler_pc)) => {
-                            self.stack.push(Value::Object(exception.0))?;
+                            self.stack.push(Value::Object(exception.0));
                             self.pc = catch_handler_pc;
                         }
                     }
@@ -126,9 +135,9 @@ impl<'a> CallFrame<'a> {
 
         for catch_handler in catch_handlers {
             match &catch_handler.catch_class {
-                None => return Ok(Some((catch_handler.handler_pc))),
+                None => return Ok(Some(catch_handler.handler_pc)),
                 Some(class_name) => {
-                    let catch_class = vm.get_or_resolve_class(class_name)?;
+                    let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
                     let exception_class = vm.get_class_by_id(exception.0.class_id())?;
                     if exception_class.is_subclass_of(catch_class) {
                         return Ok(Some(catch_handler.handler_pc));

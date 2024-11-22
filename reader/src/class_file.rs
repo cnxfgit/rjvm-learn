@@ -9,7 +9,7 @@ pub struct ClassFile {
     pub flags: ClassAccessFlags,
     pub name: String,
     pub superclass: Option<String>,
-    pub interface: Vec<String>,
+    pub interfaces: Vec<String>,
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<ClassFileMethod>,
     pub deprecated: bool,

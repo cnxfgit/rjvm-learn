@@ -2,11 +2,13 @@
 extern crate bitflags;
 
 mod attribute;
+mod buffer;
 pub mod class_access_flags;
 pub mod class_file;
 pub mod class_file_field;
 pub mod class_file_method;
 pub mod class_file_version;
+pub mod class_reader;
 pub mod class_reader_error;
 pub mod constant_pool;
 pub mod exception_table;
