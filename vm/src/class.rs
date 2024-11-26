@@ -51,4 +51,33 @@ impl<'a> Class<'a> {
                 .map_or(false, |superclass| superclass.is_subclass_of(base))
             || self.interfaces.iter().any(|intf| intf.is_subclass_of(base))
     }
+
+    pub fn find_method(
+        &self,
+        method_name: &str,
+        type_descriptor: &str,
+    ) -> Option<&ClassFileMethod> {
+        self.methods
+            .iter()
+            .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
+    }
+
+    pub fn field_at_index(&self, index: usize) -> Option<&ClassFileField> {
+        if index < self.first_field_index {
+            self.superclass
+                .and_then(|superclass| superclass.field_at_index(index))
+        } else {
+            self.fields.get(index - self.first_field_index)
+        }
+    }
+
+    pub fn all_fields(&self) -> impl Iterator<Item = &ClassFileField> {
+        let mut all_fields = Vec::from_iter(
+            self.superclass
+                .iter()
+                .flat_map(|superclass| superclass.all_fields()),
+        );
+        all_fields.extend(self.fields.iter());
+        all_fields.into_iter()
+    }
 }

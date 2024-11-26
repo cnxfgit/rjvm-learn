@@ -1,4 +1,5 @@
 pub mod abstract_object;
+pub mod alloc_entry;
 pub mod array;
 pub mod array_entry_type;
 mod call_frame;
@@ -10,7 +11,11 @@ mod class_manager;
 mod class_path;
 mod class_path_entry;
 mod class_resolver_by_id;
-pub mod exception;
+pub mod exceptions;
+mod file_system_class_path_entry;
+mod gc;
+mod jar_file_class_path_entry;
+pub mod java_objects_creation;
 pub mod object;
 pub mod stack_trace_element;
 pub mod value;

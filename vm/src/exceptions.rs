@@ -1,5 +1,6 @@
-use crate::{abstract_object::AbstractObject, vm_error::VmError};
+use crate::{abstract_object::AbstractObject, value_stack::ValueStackError, vm_error::VmError};
 
+#[derive(Debug, PartialEq)]
 pub enum MethodCallFailed<'a> {
     InternalError(VmError),
     ExceptionThrown(JavaException<'a>),
@@ -8,6 +9,12 @@ pub enum MethodCallFailed<'a> {
 impl<'a> From<VmError> for MethodCallFailed<'a> {
     fn from(value: VmError) -> Self {
         Self::InternalError(value)
+    }
+}
+
+impl<'a> From<ValueStackError> for MethodCallFailed<'a> {
+    fn from(_: ValueStackError) -> Self {
+        Self::InternalError(VmError::ValidationException)
     }
 }
 
