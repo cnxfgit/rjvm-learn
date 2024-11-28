@@ -16,6 +16,8 @@ mod file_system_class_path_entry;
 mod gc;
 mod jar_file_class_path_entry;
 pub mod java_objects_creation;
+mod native_methods_impl;
+pub mod native_methods_registry;
 pub mod object;
 pub mod stack_trace_element;
 pub mod value;

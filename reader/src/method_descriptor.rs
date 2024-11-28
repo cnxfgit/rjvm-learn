@@ -1,12 +1,25 @@
+use core::fmt;
 use std::str::Chars;
 
-use crate::{class_reader_error::ClassReaderError, field_type::FieldType};
+use crate::{class_reader_error::ClassReaderError, field_type::{self, FieldType}};
+use itertools::Itertools;
 use ClassReaderError::InvalidTypeDescriptor;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct MethodDescriptor {
     pub parameters: Vec<FieldType>,
     pub return_type: Option<FieldType>,
+}
+
+impl fmt::Display for MethodDescriptor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("(")?;
+        f.write_str(&self.parameters.iter().join(", "))?;
+        match &self.return_type {
+            Some(field_type) => write!(f, ") -> {field_type}"),
+            None => f.write_str(") -> void"),
+        }
+    }
 }
 
 impl MethodDescriptor {
@@ -62,5 +75,114 @@ impl MethodDescriptor {
             }
             _ => Err(InvalidTypeDescriptor(descriptor.to_string())),
         }
+    }
+
+    pub fn num_arguments(&self) -> usize {
+        self.parameters.len()
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        class_reader_error::ClassReaderError,
+        field_type::{BaseType, FieldType},
+        method_descriptor::MethodDescriptor,
+    };
+
+    #[test]
+    fn cannot_parse_empty_descriptor() {
+        assert_cannot_parse("")
+    }
+
+    #[test]
+    fn cannot_parse_invalid_descriptor_no_arguments() {
+        assert_cannot_parse("J")
+    }
+
+    #[test]
+    fn cannot_parse_invalid_descriptor_no_return_type() {
+        assert_cannot_parse("(J)")
+    }
+
+    #[test]
+    fn cannot_parse_invalid_descriptor_trash_after() {
+        assert_cannot_parse("()JJ")
+    }
+
+    fn assert_cannot_parse(descriptor: &str) {
+        assert!(matches!(
+            MethodDescriptor::parse(descriptor),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == descriptor
+        ));
+    }
+
+    #[test]
+    fn can_parse_primitives() {
+        assert_eq!(
+            Ok(MethodDescriptor {
+                parameters: vec![
+                    FieldType::Base(BaseType::Long),
+                    FieldType::Base(BaseType::Int)
+                ],
+                return_type: Some(FieldType::Base(BaseType::Double)),
+            }),
+            MethodDescriptor::parse("(JI)D"),
+        );
+    }
+
+    #[test]
+    fn can_parse_no_args_void_return() {
+        assert_eq!(
+            Ok(MethodDescriptor {
+                parameters: vec![],
+                return_type: None,
+            }),
+            MethodDescriptor::parse("()V"),
+        );
+    }
+
+    #[test]
+    fn can_parse_arrays_objects() {
+        assert_eq!(
+            Ok(MethodDescriptor {
+                parameters: vec![
+                    FieldType::Object("java/lang/String".to_string()),
+                    FieldType::Base(BaseType::Int),
+                ],
+                return_type: Some(FieldType::Array(Box::new(FieldType::Base(BaseType::Long)))),
+            }),
+            MethodDescriptor::parse("(Ljava/lang/String;I)[J"),
+        );
+    }
+
+    #[test]
+    fn can_format_void_to_void() {
+        assert_eq!(
+            "() -> void",
+            format!("{}", MethodDescriptor::parse("()V").unwrap())
+        );
+    }
+
+    #[test]
+    fn can_format_parameters_to_return_type() {
+        assert_eq!(
+            "(java/lang/String, Int) -> Long[]",
+            format!(
+                "{}",
+                MethodDescriptor::parse("(Ljava/lang/String;I)[J").unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn can_get_num_arguments() {
+        assert_eq!(
+            2,
+            MethodDescriptor::parse("(Ljava/lang/String;I)[J")
+                .unwrap()
+                .num_arguments(),
+        );
     }
 }

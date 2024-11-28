@@ -478,6 +478,21 @@ impl Instruction {
         Ok((op_code, address))
     }
 
+    pub(crate) fn parse_instructions(
+        raw_code: &[u8],
+    ) -> Result<Vec<(usize, Instruction)>, ClassReaderError> {
+        let mut instructions: Vec<(usize, Self)> = Vec::new();
+
+        let mut index = 0;
+        while index < raw_code.len() {
+            let (op_code, new_index) = Self::parse(raw_code, index)?;
+            instructions.push((index, op_code));
+            index = new_index;
+        }
+
+        Ok(instructions)
+    }
+
     fn byte_at(raw_code: &[u8], address: usize) -> Result<u8, ClassReaderError> {
         let op_byte = *raw_code
             .get(address)

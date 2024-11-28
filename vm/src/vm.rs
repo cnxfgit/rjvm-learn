@@ -1,6 +1,6 @@
 use std::{array, collections::HashMap, fmt::Error};
 
-use log::debug;
+use log::{debug, info};
 use rjvm_reader::type_conversion::ToUsizeSafe;
 use typed_arena::Arena;
 
@@ -14,6 +14,7 @@ use crate::{
     class_resolver_by_id::ClassByIdResolver,
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
+    native_methods_registry::NativeMethodsRegistry,
     stack_trace_element::StackTraceElement,
     value::{self, Value},
     vm_error::VmError,
@@ -28,11 +29,17 @@ pub struct Vm<'a> {
 
     statics: HashMap<ClassId, AbstractObject<'a>>,
 
-    //pub native_method_registry: NativeMethodsRegistry<'a>,
+    pub native_method_registry: NativeMethodsRegistry<'a>,
+
     throwable_call_stacks: HashMap<i32, Vec<StackTraceElement<'a>>>,
 
     pub printed: Vec<Value<'a>>,
 }
+
+pub const ONE_MEGABYTE: usize = 1024 * 1024;
+const DEFAULT_MAX_MB_OF_MEMORY: usize = 100;
+pub const DEFAULT_MAX_MEMORY: usize = 100 * ONE_MEGABYTE;
+pub const DEFAULT_MAX_MEMORY_MB_STR: &str = const_format::formatcp!("{}", DEFAULT_MAX_MB_OF_MEMORY);
 
 impl<'a> ClassByIdResolver<'a> for Vm<'a> {
     fn find_class_by_id(&self, class_id: ClassId) -> Option<ClassRef<'a>> {
@@ -41,6 +48,21 @@ impl<'a> ClassByIdResolver<'a> for Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
+    pub fn new(max_memory: usize) -> Self {
+        info!("Creating new VM with maximum memory {}", max_memory);
+        let mut result = Self {
+            class_manager: Default::default(),
+            object_allocator: ObjectAllocator::with_maximun_memory(max_memory),
+            call_stack: Arena::new(),
+            statics: Default::default(),
+            native_method_registry: Default::default(),
+            throwable_call_stacks: Default::default(),
+            printed: Vec::new(),
+        };
+        crate::native_methods_impl::register_natives(&mut result.native_method_registry);
+        result
+    }
+
     pub fn get_or_resolve_class(
         &mut self,
         stack: &mut CallStack<'a>,
