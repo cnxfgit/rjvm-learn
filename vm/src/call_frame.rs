@@ -11,11 +11,12 @@ use rjvm_reader::{
 };
 
 use crate::{
-    abstract_object::AbstractObject,
+    abstract_object::{AbstractObject, ObjectKind},
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::{self, CallStack},
     class::Class,
-    class_and_method::ClassAndMethod,
+    class_and_method::{self, ClassAndMethod},
+    class_resolver_by_id::ClassByIdResolver,
     exceptions::{self, JavaException, MethodCallFailed},
     java_objects_creation::{new_java_lang_class_object, new_java_lang_string_object},
     object::Object,
@@ -877,6 +878,55 @@ impl<'a> CallFrame<'a> {
                 ));
             }
         }
+    }
+
+    fn resolve_virtual_method(
+        vm: &Vm<'a>,
+        receiver: Option<AbstractObject>,
+        class_and_method: ClassAndMethod,
+    ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
+        match receiver {
+            Some(receiver) if receiver.kind() == ObjectKind::Object => {
+                let receiver_class = vm.find_class_by_id(receiver.class_id()).ok_or(
+                    VmError::ClassNotFoundException(receiver.class_id().to_string()),
+                )?;
+
+                let resolved_method = Self::get_method_checking_superclass(
+                    receiver_class,
+                    MethodReference {
+                        class_name: &class_and_method.class.name,
+                        method_name: &class_and_method.method.name,
+                        type_descriptor: &class_and_method.method.type_descriptor,
+                    },
+                )?;
+
+                debug!(
+                    "resolved virtual method {}.{}:{} on object of class {}: using version of class {}",
+                    class_and_method.class.name,
+                    class_and_method.method.name,
+                    class_and_method.method.type_descriptor,
+                    receiver_class.name,
+                    resolved_method.class.name,
+                );
+
+                Ok(resolved_method)
+            }
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
+        }
+    }
+
+    fn get_method_receiver_and_params(
+        &self,
+        class_and_method: &ClassAndMethod<'a>,
+    ) -> Result<(Option<AbstractObject<'a>>, Vec<Value<'a>>, usize), VmError> {
+        let cur_stack_len = self.stack.len();
+        let receiver_count = if class_and_method.is_static() {
+            0
+        } else {
+            1
+        };
     }
 
     generate_compare!(execute_long_compare, pop_long);
