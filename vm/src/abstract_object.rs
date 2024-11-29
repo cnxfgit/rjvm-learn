@@ -1,5 +1,5 @@
 use core::alloc;
-use std::{fmt::Debug, marker::PhantomData};
+use std::{array, f32::consts::E, fmt::Debug, marker::PhantomData};
 
 use bitfield_struct::bitfield;
 use rjvm_reader::{
@@ -175,8 +175,23 @@ impl<'a> AbstractObject<'a> {
         next_ptr.add(1) as *mut u8
     }
 
+    pub(crate) fn from_raw_ptr(ptr: *mut u8) -> Self {
+        Self {
+            data: ptr,
+            marker: PhantomData,
+        }
+    }
+
+    pub fn is_same_as(&self, other: &AbstractObject) -> bool {
+        self.data == other.data
+    }
+
     pub fn alloc_header(&self) -> &AllocHeader {
         unsafe { &*(self.data as *const AllocHeader) }
+    }
+
+    pub fn identity_hash_code(&self) -> i32 {
+        self.alloc_header().identity_hash_code()
     }
 
     pub fn kind(&self) -> ObjectKind {
@@ -357,4 +372,29 @@ impl<'a> Debug for AbstractObject<'a> {
             ),
         }
     }
+}
+
+pub fn string_from_char_array(array: AbstractObject) -> Result<String, VmError> {
+    if array.kind() != ObjectKind::Array {
+        return Err(VmError::ValidationException);
+    }
+
+    if array.elements_type() != ArrayEntryType::Base(BaseType::Char) {
+        return Err(VmError::ValidationException);
+    }
+
+    let len = array.len().into_usize_safe();
+    let mut string_chars: Vec<u16> = Vec::with_capacity(len);
+
+    unsafe {
+        let ptr = array.data.add(ALLOC_HEADER_SIZE + ARRAY_HEADER_SIZE) as *const i64;
+        for i in 0..len {
+            let ptr = ptr.add(i);
+            let next_codepoint = std::ptr::read(ptr as *const i32) as u16;
+            string_chars.push(next_codepoint);
+        }
+    }
+
+    let string = String::from_utf16(&string_chars).expect("should have valid utf8 bytes");
+    Ok(string)
 }

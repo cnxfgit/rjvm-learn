@@ -20,6 +20,7 @@ mod native_methods_impl;
 pub mod native_methods_registry;
 pub mod object;
 pub mod stack_trace_element;
+mod time;
 pub mod value;
 mod value_stack;
 pub mod vm;

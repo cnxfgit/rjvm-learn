@@ -1,6 +1,8 @@
 use typed_arena::Arena;
 
-use crate::{abstract_object::AbstractObject, call_frame::CallFrame};
+use crate::{
+    abstract_object::AbstractObject, call_frame::CallFrame, stack_trace_element::StackTraceElement,
+};
 
 #[derive(Default)]
 pub struct CallStack<'a> {
@@ -24,6 +26,14 @@ impl<'a> AsMut<CallFrame<'a>> for CallFrameReference<'a> {
 }
 
 impl<'a> CallStack<'a> {
+    pub fn get_stack_trace_elements(&self) -> Vec<StackTraceElement<'a>> {
+        self.frames
+            .iter()
+            .rev()
+            .map(|frame| frame.as_ref().to_stack_trace_element())
+            .collect()
+    }
+
     pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut AbstractObject<'a>> {
         let mut roots = vec![];
         roots.extend(

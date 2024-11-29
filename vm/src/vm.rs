@@ -14,6 +14,7 @@ use crate::{
     class_resolver_by_id::ClassByIdResolver,
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
+    native_methods_impl::array_copy,
     native_methods_registry::NativeMethodsRegistry,
     stack_trace_element::StackTraceElement,
     value::{self, Value},
@@ -148,6 +149,23 @@ impl<'a> Vm<'a> {
         }
     }
 
+    pub(crate) fn associate_stack_trace_with_throwable(
+        &mut self,
+        throwable: AbstractObject<'a>,
+        call_stack: Vec<StackTraceElement<'a>>,
+    ) {
+        self.throwable_call_stacks
+            .insert(throwable.identity_hash_code(), call_stack);
+    }
+
+    pub(crate) fn get_stack_trace_associated_with_throwable(
+        &self,
+        throwable: AbstractObject<'a>,
+    ) -> Option<&Vec<StackTraceElement<'a>>> {
+        self.throwable_call_stacks
+            .get(&throwable.identity_hash_code())
+    }
+
     pub fn run_garbage_collection(&mut self) -> Result<(), VmError> {
         let mut roots = vec![];
         roots.extend(
@@ -164,26 +182,4 @@ impl<'a> Vm<'a> {
 
         Ok(())
     }
-}
-
-pub fn array_copy<'a>(
-    src: &impl Array<'a>,
-    src_pos: i32,
-    dest: &impl Array<'a>,
-    dest_pos: i32,
-    length: usize,
-) -> Result<(), VmError> {
-    if dest.elements_type() != src.elements_type() {
-        return Err(VmError::ValidationException);
-    }
-
-    for i in 0..length {
-        let src_index = src_pos.into_usize_safe() + i;
-        let src_item = src.get_element(src_index)?;
-
-        let dest_index = dest_pos.into_usize_safe() + i;
-        dest.set_element(dest_index, src_item)?;
-    }
-
-    Ok(())
 }
