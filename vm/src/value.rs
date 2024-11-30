@@ -1,6 +1,11 @@
+use rjvm_reader::field_type::{BaseType, FieldType};
+
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
+    array_entry_type,
+    class::ClassRef,
+    class_resolver_by_id::ClassByIdResolver,
     object::{self, Object},
     vm_error::VmError,
 };
@@ -15,6 +20,82 @@ pub enum Value<'a> {
     Double(f64),
     Object(AbstractObject<'a>),
     Null,
+}
+
+impl<'a> Value<'a> {
+    pub fn matches_type<'b, 'c, ResByName>(
+        &self,
+        expected_type: FieldType,
+        class_resolver_by_id: &impl ClassByIdResolver<'c>,
+        class_resolver_by_name: ResByName,
+    ) -> bool
+    where
+        ResByName: FnOnce(&str) -> Option<ClassRef<'b>>,
+    {
+        match self {
+            Value::Uninitialized => false,
+            Value::Int(_) => match expected_type {
+                FieldType::Base(base_type) => matches!(
+                    base_type,
+                    BaseType::Int
+                        | BaseType::Byte
+                        | BaseType::Char
+                        | BaseType::Short
+                        | BaseType::Boolean
+                ),
+                _ => false,
+            },
+            Value::Long(_) => match expected_type {
+                FieldType::Base(base_type) => base_type == BaseType::Long,
+                _ => false,
+            },
+            Value::Float(_) => match expected_type {
+                FieldType::Base(base_type) => base_type == BaseType::Float,
+                _ => false,
+            },
+            Value::Double(_) => match expected_type {
+                FieldType::Base(base_type) => base_type == BaseType::Double,
+                _ => false,
+            },
+            Value::Object(object) => {
+                if object.kind() == ObjectKind::Array {
+                    match expected_type {
+                        FieldType::Array(expected_field_type) => {
+                            let array_entry_type =
+                                object.elements_type().into_field_type(class_resolver_by_id);
+                            if let Some(array_entry_type) = array_entry_type {
+                                array_entry_type == *expected_field_type
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    }
+                } else {
+                    match expected_type {
+                        FieldType::Object(expected_class_name) => {
+                            let value_class =
+                                class_resolver_by_id.find_class_by_id(object.class_id());
+                            if let Some(object_class) = value_class {
+                                let expected_class = class_resolver_by_name(&expected_class_name);
+                                expected_class.map_or(false, |expected_class| {
+                                    object_class.is_subclass_of(expected_class)
+                                })
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    }
+                }
+            }
+            Value::Null => match expected_type {
+                FieldType::Base(_) => false,
+                FieldType::Object(_) => true,
+                FieldType::Array(_) => true,
+            },
+        }
+    }
 }
 
 pub fn expect_abstract_object_at<'a>(

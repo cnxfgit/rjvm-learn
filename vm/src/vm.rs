@@ -1,6 +1,6 @@
-use std::{array, collections::HashMap, fmt::Error};
+use std::collections::HashMap;
 
-use log::{debug, info};
+use log::{debug, error, info};
 use rjvm_reader::type_conversion::ToUsizeSafe;
 use typed_arena::Arena;
 
@@ -8,8 +8,10 @@ use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
     array_entry_type::ArrayEntryType,
+    call_frame::MethodCallResult,
     call_stack::CallStack,
     class::{ClassId, ClassRef},
+    class_and_method::{self, ClassAndMethod},
     class_manager::{ClassManager, ResolvedClass},
     class_resolver_by_id::ClassByIdResolver,
     exceptions::MethodCallFailed,
@@ -30,7 +32,7 @@ pub struct Vm<'a> {
 
     statics: HashMap<ClassId, AbstractObject<'a>>,
 
-    pub native_method_registry: NativeMethodsRegistry<'a>,
+    pub native_methods_registry: NativeMethodsRegistry<'a>,
 
     throwable_call_stacks: HashMap<i32, Vec<StackTraceElement<'a>>>,
 
@@ -56,11 +58,11 @@ impl<'a> Vm<'a> {
             object_allocator: ObjectAllocator::with_maximun_memory(max_memory),
             call_stack: Arena::new(),
             statics: Default::default(),
-            native_method_registry: Default::default(),
+            native_methods_registry: Default::default(),
             throwable_call_stacks: Default::default(),
             printed: Vec::new(),
         };
-        crate::native_methods_impl::register_natives(&mut result.native_method_registry);
+        crate::native_methods_impl::register_natives(&mut result.native_methods_registry);
         result
     }
 
@@ -79,6 +81,52 @@ impl<'a> Vm<'a> {
         Ok(class.get_class())
     }
 
+    pub fn invoke(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        class_and_method: ClassAndMethod<'a>,
+        object: Option<AbstractObject<'a>>,
+        args: Vec<Value<'a>>,
+    ) -> MethodCallResult<'a> {
+        if class_and_method.method.is_native() {
+            return self.invoke_native(call_stack, class_and_method, object, args);
+        }
+
+        let mut frame = call_stack.add_frame(class_and_method, object, args)?;
+        let result = frame.as_mut().execute(self, call_stack);
+        call_stack
+            .pop_frame()
+            .expect("should be able to pop the frame we just pushed");
+        result
+    }
+
+    fn invoke_native(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        class_and_method: ClassAndMethod<'a>,
+        object: Option<AbstractObject<'a>>,
+        args: Vec<Value<'a>>,
+    ) -> MethodCallResult<'a> {
+        let native_callback = self.native_methods_registry.get_method(&class_and_method);
+        if let Some(native_callback) = native_callback {
+            debug!(
+                "executing native method {}::{} {}",
+                class_and_method.class.name,
+                class_and_method.method.name,
+                class_and_method.method.type_descriptor
+            );
+            native_callback(self, call_stack, object, args)
+        } else {
+            error!(
+                "cannot resolve native method {}::{} {}",
+                class_and_method.class.name,
+                class_and_method.method.name,
+                class_and_method.method.type_descriptor
+            );
+            Err(MethodCallFailed::InternalError(VmError::NotImplemented))
+        }
+    }
+
     fn init_class(
         &mut self,
         stack: &mut CallStack<'a>,
@@ -92,6 +140,10 @@ impl<'a> Vm<'a> {
     pub fn get_class_by_id(&self, class_id: ClassId) -> Result<ClassRef<'a>, VmError> {
         self.find_class_by_id(class_id)
             .ok_or(VmError::ValidationException)
+    }
+
+    pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {
+        self.class_manager.find_class_by_name(class_name)
     }
 
     pub fn new_object(

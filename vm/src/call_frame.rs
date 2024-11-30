@@ -1,10 +1,11 @@
-use std::{mem, string};
+use std::f32::consts::E;
 
 use log::{debug, warn};
 use rjvm_reader::{
     class_file_method::ClassFileMethod,
     constant_pool::ConstantPoolEntry,
-    instruction::{self, Instruction},
+    field_type::{BaseType, FieldType, FieldType::Base},
+    instruction::Instruction,
     line_number::LineNumber,
     program_counter::ProgramCounter,
     type_conversion::ToUsizeSafe,
@@ -85,7 +86,7 @@ macro_rules! generate_pop {
 
 macro_rules! generate_execute_return {
     ($name: ident, $variant:ident) => {
-        fn $name(&mut self) -> MethodCallFailed<'a> {
+        fn $name(&mut self) -> MethodCallResult<'a> {
             if !self.class_and_method.returns(Base(BaseType::$variant)) {
                 return Err(MethodCallFailed::InternalError(
                     VmError::ValidationException,
@@ -98,7 +99,7 @@ macro_rules! generate_execute_return {
     };
 }
 
-macro_rules! generate_execute_match {
+macro_rules! generate_execute_math {
     ($name: ident, $pop_fn: ident, $variant: ident, $type: ty) => {
         fn $name<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
         where
@@ -106,8 +107,8 @@ macro_rules! generate_execute_match {
         {
             let val2 = self.$pop_fn()?;
             let val1 = self.$pop_fn()?;
-            let result = evaluator(val1, val2);
-            self.push($variant(result));
+            let result = evaluator(val1, val2)?;
+            self.push($variant(result))
         }
     };
 }
@@ -215,6 +216,30 @@ macro_rules! generate_execute_array_store {
 }
 
 impl<'a> CallFrame<'a> {
+    pub fn new(class_and_method: ClassAndMethod<'a>, locals: Vec<Value<'a>>) -> Self {
+        let max_stack_size = class_and_method
+            .method
+            .code
+            .as_ref()
+            .expect("method is not native")
+            .max_stack
+            .into_usize_safe();
+        let code = &class_and_method
+            .method
+            .code
+            .as_ref()
+            .expect("method is not native")
+            .code;
+
+        CallFrame {
+            class_and_method,
+            pc: ProgramCounter(0),
+            locals,
+            stack: ValueStack::with_max_size(max_stack_size),
+            code,
+        }
+    }
+
     pub fn to_stack_trace_element(&self) -> StackTraceElement<'a> {
         StackTraceElement {
             class_name: &self.class_and_method.class.name,
@@ -421,7 +446,6 @@ impl<'a> CallFrame<'a> {
             Instruction::Invokeinterface(constant_index, _) => {
                 self.invoke_method(vm, call_stack, constant_index, InvokeKind::Interface)?
             }
-
             Instruction::Return => {
                 if !self.class_and_method.is_void() {
                     return Err(MethodCallFailed::InternalError(
@@ -922,11 +946,245 @@ impl<'a> CallFrame<'a> {
         class_and_method: &ClassAndMethod<'a>,
     ) -> Result<(Option<AbstractObject<'a>>, Vec<Value<'a>>, usize), VmError> {
         let cur_stack_len = self.stack.len();
-        let receiver_count = if class_and_method.is_static() {
-            0
+        let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
+        let num_params = class_and_method.num_arguments();
+        if cur_stack_len < (receiver_count + num_params) {
+            return Err(VmError::ValidationException);
+        }
+
+        let receiver = if class_and_method.is_static() {
+            None
         } else {
-            1
+            Some(self.get_object_from_stack(
+                cur_stack_len - num_params - receiver_count,
+                class_and_method.class,
+            )?)
         };
+
+        let mut params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
+        Self::fix_long_and_double_params(&mut params)?;
+
+        Ok((
+            receiver,
+            params,
+            cur_stack_len - num_params - receiver_count,
+        ))
+    }
+
+    fn fix_long_and_double_params(params: &mut Vec<Value>) -> Result<(), VmError> {
+        let mut num_params = params.len();
+        let mut i = 0usize;
+        while i < num_params {
+            let val = &params[i];
+            match val {
+                Long(_) | Double(_) => {
+                    params.insert(i + 1, Value::Uninitialized);
+                    num_params += 1;
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+
+        Ok(())
+    }
+
+    fn get_object_from_stack(
+        &self,
+        index: usize,
+        _expected_class: &Class,
+    ) -> Result<AbstractObject<'a>, VmError> {
+        let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
+        match receiver {
+            Value::Object(object) => Ok(object.clone()),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn validate_type_opt(
+        vm: &Vm,
+        expected_type: Option<FieldType>,
+        value: &Option<Value<'a>>,
+    ) -> Result<(), VmError> {
+        match expected_type {
+            None => match value {
+                None => Ok(()),
+                Some(_) => Err(VmError::ValidationException),
+            },
+            Some(expected_type) => match value {
+                None => Err(VmError::ValidationException),
+                Some(value) => Self::validate_type(vm, expected_type, value),
+            },
+        }
+    }
+
+    fn validate_type(vm: &Vm, expected_type: FieldType, value: &Value) -> Result<(), VmError> {
+        if value.matches_type(expected_type, vm, |class_name| {
+            vm.find_class_by_name(class_name)
+        }) {
+            Ok(())
+        } else {
+            Err(VmError::ValidationException)
+        }
+    }
+
+    fn execute_areturn(&mut self) -> MethodCallResult<'a> {
+        let result = self.pop()?;
+        self.debug_done_execution(Some(&result));
+        Ok(Some(result))
+    }
+
+    generate_execute_return!(execute_ireturn, Int);
+    generate_execute_return!(execute_lreturn, Long);
+    generate_execute_return!(execute_freturn, Float);
+    generate_execute_return!(execute_dreturn, Double);
+
+    fn get_local_int(&self, vm: &Vm, index: usize) -> Result<Value<'a>, VmError> {
+        let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        Self::validate_type(vm, Base(BaseType::Int), variable)?;
+        Ok(variable.clone())
+    }
+
+    fn get_local_int_as_int(&self, vm: &Vm, index: usize) -> Result<i32, VmError> {
+        let value = self.get_local_int(vm, index)?;
+        match value {
+            Int(the_int) => Ok(the_int),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    generate_execute_math!(execute_int_math, pop_int, Int, i32);
+    generate_execute_math!(execute_long_math, pop_long, Long, i64);
+    generate_execute_math!(execute_float_math, pop_float, Float, f32);
+    generate_execute_math!(execute_double_math, pop_double, Double, f64);
+
+    fn execute_long_shift<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
+    where
+        T: FnOnce(i64, i32) -> Result<i64, VmError>,
+    {
+        let val2 = self.pop_int()?;
+        let val1 = self.pop_long()?;
+        let result = evaluator(val1, val2)?;
+        self.push(Long(result))
+    }
+
+    fn is_double_division_returning_nan(a: f64, b: f64) -> bool {
+        a.is_nan()
+            || b.is_nan()
+            || (a.is_infinite() && b.is_infinite())
+            || ((a == 0f64 || a == -0f64) && (b == 0f64 || b == -0f64))
+    }
+
+    generate_execute_neg!(execute_ineg, pop_int, Int);
+    generate_execute_neg!(execute_lneg, pop_long, Long);
+    generate_execute_neg!(execute_fneg, pop_float, Float);
+    generate_execute_neg!(execute_dneg, pop_double, Double);
+
+    generate_execute_coerce!(coerce_int, pop_int, i32);
+    generate_execute_coerce!(coerce_long, pop_long, i64);
+    generate_execute_coerce!(coerce_float, pop_float, f32);
+    generate_execute_coerce!(coerce_double, pop_double, f64);
+
+    fn goto(&mut self, jump_address: u16) {
+        self.pc = ProgramCounter(jump_address);
+    }
+
+    fn execute_if<T>(
+        &mut self,
+        jump_address: u16,
+        comparator: T,
+    ) -> Result<(), MethodCallFailed<'a>>
+    where
+        T: FnOnce(i32) -> bool,
+    {
+        let value = self.pop_int()?;
+        if comparator(value) {
+            self.goto(jump_address);
+        }
+
+        Ok(())
+    }
+
+    fn execute_if_icmp<T>(
+        &mut self,
+        jump_address: u16,
+        comparator: T,
+    ) -> Result<(), MethodCallFailed<'a>>
+    where
+        T: FnOnce(i32, i32) -> bool,
+    {
+        let val2 = self.pop_int()?;
+        let val1 = self.pop_int()?;
+        if comparator(val1, val2) {
+            self.goto(jump_address);
+        }
+
+        Ok(())
+    }
+
+    fn execute_if_null(
+        &mut self,
+        jump_address: u16,
+        jump_on_null: bool,
+    ) -> Result<(), MethodCallFailed<'a>> {
+        let value = self.pop()?;
+        match value {
+            Value::Object(_) => {
+                if !jump_on_null {
+                    self.goto(jump_address);
+                }
+            }
+            Null => {
+                if jump_on_null {
+                    self.goto(jump_address);
+                }
+            }
+            _ => {
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn execute_if_acmp(
+        &mut self,
+        jump_address: u16,
+        jump_on_equal: bool,
+    ) -> Result<(), MethodCallFailed<'a>> {
+        let value2 = self.pop()?;
+        let value1 = self.pop()?;
+        let equal = match value1 {
+            Value::Object(object1) => match value2 {
+                Value::Object(object2) => object1.is_same_as(&object2),
+                Null => false,
+                _ => {
+                    return Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    ));
+                }
+            },
+            Null => match value2 {
+                Null => true,
+                Value::Object(..) => false,
+                _ => {
+                    return Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    ));
+                }
+            },
+            _ => {
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ));
+            }
+        };
+        if (jump_on_equal && equal) || (!jump_on_equal && !equal) {
+            self.goto(jump_address);
+        }
+        Ok(())
     }
 
     generate_compare!(execute_long_compare, pop_long);
@@ -1021,36 +1279,6 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    generate_execute_neg!(execute_ineg, pop_int, Int);
-    generate_execute_neg!(execute_lneg, pop_long, Long);
-    generate_execute_neg!(execute_fneg, pop_float, Float);
-    generate_execute_neg!(execute_dneg, pop_double, Double);
-
-    generate_execute_coerce!(coerce_int, pop_int, i32);
-    generate_execute_coerce!(coerce_long, pop_long, i64);
-    generate_execute_coerce!(coerce_float, pop_float, f32);
-    generate_execute_coerce!(coerce_double, pop_double, f64);
-
-    fn goto(&mut self, jump_address: u16) {
-        self.pc = ProgramCounter(jump_address);
-    }
-
-    fn execute_if<T>(
-        &mut self,
-        jump_address: u16,
-        comparator: T,
-    ) -> Result<(), MethodCallFailed<'a>>
-    where
-        T: FnOnce(i32) -> bool,
-    {
-        let value = self.pop_int()?;
-        if comparator(value) {
-            self.goto(jump_address);
-        }
-
-        Ok(())
-    }
-
     fn find_exception_handler(
         &self,
         vm: &mut Vm<'a>,
@@ -1107,6 +1335,13 @@ impl<'a> CallFrame<'a> {
             debug!("  - {:?}", local_variable);
         }
         debug!("  next instruction: {:?}", instruction);
+    }
+
+    fn debug_done_execution(&self, result: Option<&Value>) {
+        debug!(
+            "completed execution of method {}::{} - result is {:?}",
+            self.class_and_method.class.name, self.class_and_method.method.name, result
+        )
     }
 
     pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut AbstractObject<'a>> {
