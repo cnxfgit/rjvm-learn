@@ -76,3 +76,107 @@ pub enum BaseType {
     Short,
     Boolean,
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        class_reader_error::ClassReaderError,
+        field_type::{BaseType, FieldType},
+    };
+
+    #[test]
+    fn cannot_parse_empty_descriptor() {
+        assert!(matches!(
+            FieldType::parse(""),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s.is_empty()
+        ));
+    }
+
+    #[test]
+    fn cannot_parse_invalid_primitive() {
+        assert!(matches!(
+            FieldType::parse("W"),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == "W"
+        ));
+    }
+
+    #[test]
+    fn cannot_parse_missing_semicolon() {
+        assert!(matches!(
+            FieldType::parse("Ljava/lang/String"),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == "Ljava/lang/String"
+        ));
+    }
+
+    #[test]
+    fn cannot_parse_invalid_array() {
+        assert!(matches!(
+            FieldType::parse("["),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == "["
+        ));
+    }
+
+    #[test]
+    fn can_parse_primitive_descriptors() {
+        assert_eq!(Ok(FieldType::Base(BaseType::Byte)), FieldType::parse("B"));
+        assert_eq!(Ok(FieldType::Base(BaseType::Char)), FieldType::parse("C"));
+        assert_eq!(Ok(FieldType::Base(BaseType::Double)), FieldType::parse("D"));
+        assert_eq!(Ok(FieldType::Base(BaseType::Float)), FieldType::parse("F"));
+        assert_eq!(Ok(FieldType::Base(BaseType::Int)), FieldType::parse("I"));
+        assert_eq!(Ok(FieldType::Base(BaseType::Long)), FieldType::parse("J"));
+        assert_eq!(Ok(FieldType::Base(BaseType::Short)), FieldType::parse("S"));
+        assert_eq!(
+            Ok(FieldType::Base(BaseType::Boolean)),
+            FieldType::parse("Z")
+        );
+    }
+
+    #[test]
+    fn can_parse_object_descriptors() {
+        assert_eq!(
+            Ok(FieldType::Object("rjvm/Test".to_string())),
+            FieldType::parse("Lrjvm/Test;")
+        );
+    }
+
+    #[test]
+    fn can_parse_array_description() {
+        assert_eq!(
+            Ok(FieldType::Array(Box::new(FieldType::Base(BaseType::Int)))),
+            FieldType::parse("[I")
+        );
+        assert_eq!(
+            Ok(FieldType::Array(Box::new(FieldType::Object(
+                "java/lang/String".to_string()
+            )))),
+            FieldType::parse("[Ljava/lang/String;")
+        );
+
+        assert_eq!(
+            Ok(FieldType::Array(Box::new(FieldType::Array(Box::new(
+                FieldType::Base(BaseType::Double)
+            ))))),
+            FieldType::parse("[[D")
+        );
+    }
+
+    #[test]
+    fn can_format_base_type() {
+        assert_eq!("Long", format!("{}", FieldType::parse("J").unwrap()));
+    }
+
+    #[test]
+    fn can_format_object() {
+        assert_eq!(
+            "java/lang/String",
+            format!("{}", FieldType::parse("Ljava/lang/String;").unwrap())
+        );
+    }
+
+    #[test]
+    fn can_format_array() {
+        assert_eq!("Int[]", format!("{}", FieldType::parse("[I").unwrap()));
+    }
+}
+

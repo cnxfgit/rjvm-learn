@@ -156,3 +156,4 @@ pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
         Err(VmError::ValidationException)
     }
 }
+

@@ -9,7 +9,7 @@ use typed_arena::Arena;
 use crate::{
     class::{Class, ClassId, ClassRef},
     class_loader::ClassLoader,
-    class_path::ClassPath,
+    class_path::{ClassPath, ClassPathParseError},
     class_resolver_by_id::ClassByIdResolver,
     vm_error::VmError,
 };
@@ -73,6 +73,10 @@ impl<'a> ClassByIdResolver<'a> for ClassManager<'a> {
 }
 
 impl<'a> ClassManager<'a> {
+    pub fn append_class_path(&mut self, class_path: &str) -> Result<(), ClassPathParseError> {
+        self.class_path.push(class_path)
+    }
+
     pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {
         self.classes_by_name.get(class_name).cloned()
     }

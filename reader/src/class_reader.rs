@@ -233,7 +233,15 @@ impl<'a> ClassFileReader<'a> {
         Ok(())
     }
 
-    fn read_fields(&mut self) -> Result<ClassFileField> {
+    fn read_fields(&mut self) -> Result<()> {
+        let fields_count = self.buffer.read_u16()?;
+        self.class_file.fields = (0..fields_count)
+            .map(|_| self.read_field())
+            .collect::<Result<Vec<ClassFileField>>>()?;
+        Ok(())
+    }
+
+    fn read_field(&mut self) -> Result<ClassFileField> {
         let flags = self.read_field_flags()?;
         let name_constant_index = self.buffer.read_u16()?;
         let name = self.read_string_reference(name_constant_index)?;
@@ -512,4 +520,19 @@ impl<'a> ClassFileReader<'a> {
 
 pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
     ClassFileReader::new(buf).read()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{class_reader::read_buffer, class_reader_error::ClassReaderError};
+
+    #[test]
+    fn magic_number_is_required() {
+        let data = vec![0x00, 0x01, 0x02, 0x03];
+        assert!(matches!(
+            read_buffer(&data),
+            Err(ClassReaderError::InvalidClassData(s, None)) if s == "invalid magic number"
+        ));
+    }
 }

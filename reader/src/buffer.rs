@@ -85,3 +85,21 @@ impl<'a> Buffer<'a> {
         self.position < self.buffer.len()
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::buffer::Buffer;
+
+    #[test]
+    fn buffer_works() {
+        let data = vec![0x00, 0x00, 0x00, 0x42];
+        let mut buffer = Buffer::new(&data);
+
+        assert!(buffer.has_more_data());
+        assert_eq!(0x42u32, buffer.read_u32().unwrap());
+        assert!(!buffer.has_more_data());
+
+        assert!(buffer.read_u32().is_err());
+    }
+}

@@ -16,7 +16,7 @@ impl<'a> Display for StackTraceElement<'a> {
             if let Some(line_number) = self.line_number {
                 write!(
                     f,
-                    "{}::{}  ({}:{})",
+                    "{}::{} ({}:{})",
                     self.class_name, self.method_name, file_name, line_number
                 )
             } else {

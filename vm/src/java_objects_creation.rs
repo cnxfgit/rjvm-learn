@@ -36,7 +36,7 @@ pub fn new_java_lang_string_object<'a>(
 }
 
 pub fn extract_str_from_java_lang_string<'a>(
-    vm: &mut Vm<'a>,
+    vm: &Vm<'a>,
     object: &impl Object<'a>,
 ) -> Result<String, VmError> {
     let class = vm.get_class_by_id(object.class_id())?;

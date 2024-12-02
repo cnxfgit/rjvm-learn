@@ -1,3 +1,5 @@
+use core::fmt;
+
 use thiserror::Error;
 
 #[derive(Debug, PartialEq)]
@@ -75,6 +77,60 @@ impl ConstantPool {
         }
     }
 
+    fn fmt_entry(&self, idx: u16) -> Result<String, InvalidConstantPoolIndexError> {
+        let entry = self.get(idx)?;
+        let text = match entry {
+            ConstantPoolEntry::Utf8(ref s) => format!("String: \"{s}\""),
+            ConstantPoolEntry::Integer(n) => format!("Integer: {n}"),
+            ConstantPoolEntry::Float(n) => format!("Float: {n}"),
+            ConstantPoolEntry::Long(n) => format!("Long: {n}"),
+            ConstantPoolEntry::Double(n) => format!("Double: {n}"),
+            ConstantPoolEntry::ClassReference(n) => {
+                format!("ClassReference: {} => ({})", n, self.fmt_entry(*n)?)
+            }
+            ConstantPoolEntry::StringReference(n) => {
+                format!("StringReference: {} => ({})", n, self.fmt_entry(*n)?)
+            }
+            ConstantPoolEntry::FieldReference(i, j) => {
+                format!(
+                    "FieldReference: {}, {} => ({}), ({})",
+                    i,
+                    j,
+                    self.fmt_entry(*i)?,
+                    self.fmt_entry(*j)?
+                )
+            }
+            ConstantPoolEntry::MethodReference(i, j) => {
+                format!(
+                    "MethodReference: {}, {} => ({}), ({})",
+                    i,
+                    j,
+                    self.fmt_entry(*i)?,
+                    self.fmt_entry(*j)?
+                )
+            }
+            ConstantPoolEntry::InterfaceMethodReference(i, j) => {
+                format!(
+                    "InterfaceMethodReference: {}, {} => ({}), ({})",
+                    i,
+                    j,
+                    self.fmt_entry(*i)?,
+                    self.fmt_entry(*j)?
+                )
+            }
+            &ConstantPoolEntry::NameAndTypeDescriptor(i, j) => {
+                format!(
+                    "NameAndTypeDescriptor: {}, {} => ({}), ({})",
+                    i,
+                    j,
+                    self.fmt_entry(i)?,
+                    self.fmt_entry(j)?
+                )
+            }
+        };
+        Ok(text)
+    }
+
     pub fn text_of(&self, idx: u16) -> Result<String, InvalidConstantPoolIndexError> {
         let entry = self.get(idx)?;
 
@@ -104,6 +160,18 @@ impl ConstantPool {
     }
 }
 
+
+impl fmt::Display for ConstantPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Constant pool: (size: {})", self.entries.len())?;
+        for (raw_idx, _) in self.entries.iter().enumerate() {
+            let index = (raw_idx+1) as u16;
+            let entry_text = self.fmt_entry(index).map_err(|_|fmt::Error::default())?;
+            writeln!(f, "    {}, {}", index, entry_text)?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

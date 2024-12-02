@@ -32,7 +32,6 @@ impl Error for ClassLoadingError {
     }
 }
 
-// Test utilities used by multiple files
 #[cfg(test)]
 pub mod tests {
     use crate::class_path_entry::ClassPathEntry;

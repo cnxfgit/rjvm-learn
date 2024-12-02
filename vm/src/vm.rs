@@ -13,6 +13,7 @@ use crate::{
     class::{ClassId, ClassRef},
     class_and_method::ClassAndMethod,
     class_manager::{ClassManager, ResolvedClass},
+    class_path::ClassPathParseError,
     class_resolver_by_id::ClassByIdResolver,
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
@@ -28,7 +29,7 @@ pub struct Vm<'a> {
 
     object_allocator: ObjectAllocator<'a>,
 
-    call_stack: Arena<CallStack<'a>>,
+    call_stacks: Arena<CallStack<'a>>,
 
     statics: HashMap<ClassId, AbstractObject<'a>>,
 
@@ -56,7 +57,7 @@ impl<'a> Vm<'a> {
         let mut result = Self {
             class_manager: Default::default(),
             object_allocator: ObjectAllocator::with_maximun_memory(max_memory),
-            call_stack: Arena::new(),
+            call_stacks: Arena::new(),
             statics: Default::default(),
             native_methods_registry: Default::default(),
             throwable_call_stacks: Default::default(),
@@ -68,6 +69,10 @@ impl<'a> Vm<'a> {
 
     pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<AbstractObject<'a>> {
         self.statics.get(&class_id).cloned()
+    }
+
+    pub fn append_class_path(&mut self, class_path: &str) -> Result<(), ClassPathParseError> {
+        self.class_manager.append_class_path(class_path)
     }
 
     pub fn get_or_resolve_class(
@@ -131,6 +136,14 @@ impl<'a> Vm<'a> {
         }
     }
 
+    pub fn allocate_call_stack(&mut self) -> &'a mut CallStack<'a> {
+        let stack = self.call_stacks.alloc(CallStack::new());
+        unsafe {
+            let stack_ptr: *mut CallStack<'a> = stack;
+            &mut *stack_ptr
+        }
+    }
+
     fn init_class(
         &mut self,
         stack: &mut CallStack<'a>,
@@ -161,6 +174,28 @@ impl<'a> Vm<'a> {
 
     pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {
         self.class_manager.find_class_by_name(class_name)
+    }
+
+    pub fn resolve_class_method(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        class_name: &str,
+        method_name: &str,
+        method_type_descriptor: &str,
+    ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
+        self.get_or_resolve_class(call_stack, class_name)
+            .and_then(|class| {
+                class
+                    .find_method(method_name, method_type_descriptor)
+                    .map(|method| ClassAndMethod { class, method })
+                    .ok_or(MethodCallFailed::InternalError(
+                        VmError::MethodNotFoundException(
+                            class_name.to_string(),
+                            method_name.to_string(),
+                            method_type_descriptor.to_string(),
+                        ),
+                    ))
+            })
     }
 
     pub fn new_object(
@@ -235,6 +270,13 @@ impl<'a> Vm<'a> {
             .get(&throwable.identity_hash_code())
     }
 
+    pub fn debug_stats(&self) {
+        debug!(
+            "VM classes={:?} allocator={:?}",
+            self.class_manager, self.object_allocator
+        )
+    }
+
     pub fn run_garbage_collection(&mut self) -> Result<(), VmError> {
         let mut roots = vec![];
         roots.extend(
@@ -242,7 +284,7 @@ impl<'a> Vm<'a> {
                 .iter_mut()
                 .map(|(_, object)| object as *mut AbstractObject<'a>),
         );
-        roots.extend(self.call_stack.iter_mut().flat_map(|s| s.gc_roots()));
+        roots.extend(self.call_stacks.iter_mut().flat_map(|s| s.gc_roots()));
 
         unsafe {
             self.object_allocator

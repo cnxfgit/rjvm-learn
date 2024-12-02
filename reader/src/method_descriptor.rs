@@ -28,7 +28,7 @@ impl MethodDescriptor {
         match chars.next() {
             Some('(') => {
                 let parameters = Self::parse_parameters(descriptor, &mut chars)?;
-                if Some('(') == chars.next() {
+                if Some(')') == chars.next() {
                     let return_type = Self::parse_return_type(descriptor, &mut chars)?;
                     Ok(MethodDescriptor {
                         parameters,
