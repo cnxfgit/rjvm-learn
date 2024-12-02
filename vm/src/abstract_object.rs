@@ -1,14 +1,13 @@
-use core::alloc;
-use std::{array, f32::consts::E, fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData};
 
 use bitfield_struct::bitfield;
 use rjvm_reader::{
-    field_type::{self, BaseType, FieldType},
+    field_type::{BaseType, FieldType},
     type_conversion::ToUsizeSafe,
 };
 
 use crate::{
-    alloc_entry::{self, AllocEntry},
+    alloc_entry::AllocEntry,
     array::Array,
     array_entry_type::ArrayEntryType,
     class::{Class, ClassId, ClassRef},
@@ -186,7 +185,7 @@ impl<'a> AbstractObject<'a> {
         self.data == other.data
     }
 
-    pub fn alloc_header(&self) -> &AllocHeader {
+    fn alloc_header(&self) -> &AllocHeader {
         unsafe { &*(self.data as *const AllocHeader) }
     }
 

@@ -1,7 +1,7 @@
 use core::fmt;
 use std::str::Chars;
 
-use crate::{class_reader_error::ClassReaderError, field_type::{self, FieldType}};
+use crate::{class_reader_error::ClassReaderError, field_type::FieldType};
 use itertools::Itertools;
 use ClassReaderError::InvalidTypeDescriptor;
 

@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{error::Error, f32::consts::E};
+use std::error::Error;
 
 pub trait ClassPathEntry: fmt::Debug {
     fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError>;

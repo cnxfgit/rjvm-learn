@@ -5,7 +5,7 @@ use crate::{
     abstract_object::AbstractObject,
     call_frame::MethodCallResult,
     call_stack::CallStack,
-    class_and_method::{self, ClassAndMethod},
+    class_and_method::ClassAndMethod,
     value::Value,
     vm::Vm,
 };

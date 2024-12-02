@@ -11,7 +11,7 @@ use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
     class::{ClassId, ClassRef},
-    class_and_method::{self, ClassAndMethod},
+    class_and_method::ClassAndMethod,
     class_manager::{ClassManager, ResolvedClass},
     class_resolver_by_id::ClassByIdResolver,
     exceptions::MethodCallFailed,
@@ -19,7 +19,7 @@ use crate::{
     native_methods_impl::array_copy,
     native_methods_registry::NativeMethodsRegistry,
     stack_trace_element::StackTraceElement,
-    value::{self, Value},
+    value::Value,
     vm_error::VmError,
 };
 
@@ -64,6 +64,10 @@ impl<'a> Vm<'a> {
         };
         crate::native_methods_impl::register_natives(&mut result.native_methods_registry);
         result
+    }
+
+    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<AbstractObject<'a>> {
+        self.statics.get(&class_id).cloned()
     }
 
     pub fn get_or_resolve_class(
@@ -133,7 +137,20 @@ impl<'a> Vm<'a> {
         class_to_init: &ClassRef<'a>,
     ) -> Result<(), MethodCallFailed<'a>> {
         debug!("creating static instance of {}", class_to_init.name);
-
+        let static_instance = self.new_object_of_class(class_to_init);
+        self.statics.insert(class_to_init.id, static_instance);
+        if let Some(clinit_method) = class_to_init.find_method("<clinit>", "()V") {
+            debug!("invoking {}::<clinit>()", class_to_init.name);
+            self.invoke(
+                stack,
+                ClassAndMethod {
+                    class: class_to_init,
+                    method: clinit_method,
+                },
+                None,
+                Vec::new(),
+            )?;
+        }
         Ok(())
     }
 

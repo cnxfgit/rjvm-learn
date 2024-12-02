@@ -1,9 +1,6 @@
 use log::debug;
 
-use crate::{
-    class_loader::ClassLoader,
-    class_path_entry::{ClassLoadingError, ClassPathEntry},
-};
+use crate::class_path_entry::{ClassLoadingError, ClassPathEntry};
 
 #[allow(dead_code)]
 #[derive(Default, Debug)]

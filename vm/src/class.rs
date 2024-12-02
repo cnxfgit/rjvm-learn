@@ -1,7 +1,7 @@
 use std::{fmt, fmt::Formatter};
 
 use rjvm_reader::{
-    class_access_flags::ClassAccessFlags, class_file::ClassFile, class_file_field::ClassFileField,
+    class_access_flags::ClassAccessFlags, class_file_field::ClassFileField,
     class_file_method::ClassFileMethod, constant_pool::ConstantPool,
 };
 
@@ -60,6 +60,21 @@ impl<'a> Class<'a> {
         self.methods
             .iter()
             .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
+    }
+
+    pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
+        self.fields
+            .iter()
+            .enumerate()
+            .find(|entry| entry.1.name == field_name)
+            .map(|(index, field)| (index + self.first_field_index, field))
+            .or_else(|| {
+                if let Some(superclass) = &self.superclass {
+                    superclass.find_field(field_name)
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn field_at_index(&self, index: usize) -> Option<&ClassFileField> {

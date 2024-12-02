@@ -11,7 +11,6 @@ use crate::{
     class_loader::ClassLoader,
     class_path::ClassPath,
     class_resolver_by_id::ClassByIdResolver,
-    vm::Vm,
     vm_error::VmError,
 };
 

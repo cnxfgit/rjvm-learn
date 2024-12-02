@@ -3,10 +3,9 @@ use rjvm_reader::field_type::{BaseType, FieldType};
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
-    array_entry_type,
     class::ClassRef,
     class_resolver_by_id::ClassByIdResolver,
-    object::{self, Object},
+    object::Object,
     vm_error::VmError,
 };
 

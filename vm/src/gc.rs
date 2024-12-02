@@ -9,7 +9,7 @@ use crate::{
     alloc_entry::AllocEntry,
     array::Array,
     array_entry_type::ArrayEntryType,
-    class::{self, Class},
+    class::Class,
     class_resolver_by_id::ClassByIdResolver,
     object::Object,
     value::Value,

@@ -6,7 +6,7 @@ use typed_arena::Arena;
 use crate::{
     abstract_object::AbstractObject,
     call_frame::CallFrame,
-    class_and_method::{self, ClassAndMethod},
+    class_and_method::ClassAndMethod,
     stack_trace_element::StackTraceElement,
     value::Value,
     vm_error::VmError,

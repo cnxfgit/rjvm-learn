@@ -1,11 +1,10 @@
 use core::fmt;
-use std::fmt::write;
 
 use crate::{
     attribute::Attribute,
     exception_table::ExceptionTable,
     field_type::{BaseType, FieldType},
-    instruction::{self, Instruction},
+    instruction::Instruction,
     line_number_table::LineNumberTable,
     method_descriptor::MethodDescriptor,
     method_flags::MethodFlags,
