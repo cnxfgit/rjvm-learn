@@ -223,7 +223,6 @@ impl Instruction {
     pub fn parse(raw_code: &[u8], address: usize) -> Result<(Self, usize), ClassReaderError> {
         let op_byte = Self::byte_at(raw_code, address)?;
         let mut address = address + 1;
-
         let op_code = match op_byte {
             0x32 => Instruction::Aaload,
             0x53 => Instruction::Aastore,
@@ -531,7 +530,6 @@ impl Instruction {
     fn read_offset(raw_code: &[u8], address: &mut usize) -> Result<u16, ClassReaderError> {
         let instruction_address = *address - 1;
         let offset = Self::read_i16(raw_code, address)?;
-
         let jump_address = (instruction_address as i32) + (offset as i32);
         u16::try_from(jump_address).map_err(|_| {
             ClassReaderError::invalid_class_data(format!(

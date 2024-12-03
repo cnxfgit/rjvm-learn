@@ -38,7 +38,6 @@ impl JarFileClassPathEntry {
         let buf_reader = BufReader::new(file);
         let zip = ZipArchive::new(buf_reader)
             .map_err(|_| JarFileError::InvalidJar(path.to_string_lossy().to_string()))?;
-
         Ok(Self {
             file_name: path.to_string_lossy().to_string(),
             zip: RefCell::new(zip),
@@ -73,7 +72,7 @@ pub enum JarFileError {
     #[error("error reading file {0}")]
     ReadingError(String),
 
-    #[error("file {0} is not valid jar")]
+    #[error("file {0} is not a valid jar")]
     InvalidJar(String),
 }
 

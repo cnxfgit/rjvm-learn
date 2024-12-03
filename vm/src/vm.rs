@@ -56,7 +56,7 @@ impl<'a> Vm<'a> {
         info!("Creating new VM with maximum memory {}", max_memory);
         let mut result = Self {
             class_manager: Default::default(),
-            object_allocator: ObjectAllocator::with_maximun_memory(max_memory),
+            object_allocator: ObjectAllocator::with_maximum_memory(max_memory),
             call_stacks: Arena::new(),
             statics: Default::default(),
             native_methods_registry: Default::default(),
@@ -86,7 +86,6 @@ impl<'a> Vm<'a> {
                 self.init_class(stack, class_to_init)?;
             }
         }
-
         Ok(class.get_class())
     }
 
@@ -288,9 +287,8 @@ impl<'a> Vm<'a> {
 
         unsafe {
             self.object_allocator
-                .do_garbage_collection(roots, &self.class_manager)?
+                .do_garbage_collection(roots, &self.class_manager)?;
         }
-
         Ok(())
     }
 }

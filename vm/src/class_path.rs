@@ -2,7 +2,9 @@ use log::debug;
 use thiserror::Error;
 
 use crate::{
-    class_path_entry::{ClassLoadingError, ClassPathEntry}, file_system_class_path_entry::FileSystemClassPathEntry, jar_file_class_path_entry::JarFileClassPathEntry
+    class_path_entry::{ClassLoadingError, ClassPathEntry},
+    file_system_class_path_entry::FileSystemClassPathEntry,
+    jar_file_class_path_entry::JarFileClassPathEntry,
 };
 
 #[allow(dead_code)]
@@ -55,11 +57,9 @@ impl ClassPath {
                 return Ok(Some(class_bytes));
             }
         }
-
         Ok(None)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

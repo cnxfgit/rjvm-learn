@@ -338,7 +338,7 @@ fn stack_trace_printing() {
 #[test_log::test]
 fn exceptions_throwing_and_catching() {
     let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
-    let main_result = invoke(
+    let main_result: Result<Option<Value<'_>>, MethodCallFailed<'_>> = invoke(
         &mut vm,
         "rjvm/ExceptionsThrowingAndCatching",
         "main",

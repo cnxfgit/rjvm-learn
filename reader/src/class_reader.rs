@@ -71,7 +71,6 @@ impl<'a> ClassFileReader<'a> {
     fn read_constants(&mut self) -> Result<()> {
         let constants_count = self.buffer.read_u16()? - 1;
         let mut i = 0;
-
         while i < constants_count {
             let tag = self.buffer.read_u8()?;
             let constant = match tag {
@@ -79,11 +78,11 @@ impl<'a> ClassFileReader<'a> {
                 3 => self.read_int_constant()?,
                 4 => self.read_float_constant()?,
                 5 => {
-                    i += 1;
+                    i += 1; // long constants takes up two slots in the pool
                     self.read_long_constant()?
                 }
                 6 => {
-                    i += 1;
+                    i += 1; // double constants takes up two slots in the pool
                     self.read_double_constant()?
                 }
                 7 => self.read_class_reference_constant()?,
@@ -92,6 +91,7 @@ impl<'a> ClassFileReader<'a> {
                 10 => self.read_method_reference_constant()?,
                 11 => self.read_interface_method_reference_constant()?,
                 12 => self.read_name_and_type_constant()?,
+                // For newer versions of java, there are more constant types
                 _ => {
                     warn!("invalid entry in constant pool at index {} tag {}", i, tag);
                     return Err(ClassReaderError::invalid_class_data(format!(
@@ -99,7 +99,6 @@ impl<'a> ClassFileReader<'a> {
                     )));
                 }
             };
-
             self.class_file.constants.add(constant);
 
             i += 1;
@@ -221,8 +220,8 @@ impl<'a> ClassFileReader<'a> {
         Self::read_string_reference_from(&self.class_file.constants, index)
     }
 
-    fn read_string_reference_from(constant_pool: &ConstantPool, index: u16) -> Result<String> {
-        constant_pool.text_of(index).map_err(|err| err.into())
+    fn read_string_reference_from(constants_pool: &ConstantPool, index: u16) -> Result<String> {
+        constants_pool.text_of(index).map_err(|err| err.into())
     }
 
     fn read_interfaces(&mut self) -> Result<()> {
@@ -267,7 +266,7 @@ impl<'a> ClassFileReader<'a> {
         match FieldFlags::from_bits(field_flags_bits) {
             Some(flags) => Ok(flags),
             None => Err(ClassReaderError::invalid_class_data(format!(
-                "invalid field flags: {field_flags_bits}"
+                "invalid field flags: {field_flags_bits:#0x}"
             ))),
         }
     }
@@ -319,7 +318,6 @@ impl<'a> ClassFileReader<'a> {
         self.class_file.methods = (0..methods_count)
             .map(|_| self.read_method())
             .collect::<Result<Vec<ClassFileMethod>>>()?;
-
         Ok(())
     }
 
@@ -331,7 +329,7 @@ impl<'a> ClassFileReader<'a> {
         let type_descriptor = self.read_string_reference(type_constant_index)?;
         let parsed_type_descriptor = MethodDescriptor::parse(&type_descriptor)?;
         let raw_attributes = self.read_raw_attributes()?;
-        let code = if flags.contains(MethodFlags::NATIVE) {
+        let code = if flags.contains(MethodFlags::NATIVE) || flags.contains(MethodFlags::ABSTRACT) {
             None
         } else {
             Some(self.extract_code(&raw_attributes, &name)?)
@@ -400,7 +398,7 @@ impl<'a> ClassFileReader<'a> {
 
     fn read_exception_table(&self, buf: &mut Buffer) -> Result<ExceptionTable> {
         let exception_table_length = buf.read_u16()?.into_usize_safe();
-        let mut entries: Vec<ExceptionTableEntry> = Vec::with_capacity(exception_table_length);
+        let mut entries: Vec<ExceptionTableEntry> = Vec::with_capacity(exception_table_length / 8);
         for _ in 0..exception_table_length {
             let start_pc = buf.read_u16()?;
             let end_pc = buf.read_u16()?;
@@ -415,7 +413,7 @@ impl<'a> ClassFileReader<'a> {
                 range: ProgramCounter(start_pc)..ProgramCounter(end_pc),
                 handler_pc: ProgramCounter(handler_pc),
                 catch_class,
-            });
+            })
         }
         Ok(ExceptionTable::new(entries))
     }
@@ -439,7 +437,6 @@ impl<'a> ClassFileReader<'a> {
                         LineNumber(line_number),
                     ));
                 }
-
                 Ok(LineNumberTable::new(entries))
             })
             .invert()
@@ -496,21 +493,20 @@ impl<'a> ClassFileReader<'a> {
     }
 
     fn read_raw_attributes_from(
-        constant_pool: &ConstantPool,
-        bufer: &mut Buffer,
+        constants_pool: &ConstantPool,
+        buffer: &mut Buffer,
     ) -> Result<Vec<Attribute>> {
-        let attributes_count = bufer.read_u16()?;
+        let attributes_count = buffer.read_u16()?;
         (0..attributes_count)
-            .map(|_| Self::read_raw_attribute(constant_pool, bufer))
+            .map(|_| Self::read_raw_attribute(constants_pool, buffer))
             .collect::<Result<Vec<Attribute>>>()
     }
 
-    fn read_raw_attribute(constant_pool: &ConstantPool, bufer: &mut Buffer) -> Result<Attribute> {
-        let name_constant_index = bufer.read_u16()?;
-        let name = Self::read_string_reference_from(constant_pool, name_constant_index)?;
-        let len = bufer.read_u32()?;
-        let bytes = bufer.read_bytes(len.into_usize_safe())?;
-
+    fn read_raw_attribute(constants_pool: &ConstantPool, buffer: &mut Buffer) -> Result<Attribute> {
+        let name_constant_index = buffer.read_u16()?;
+        let name = Self::read_string_reference_from(constants_pool, name_constant_index)?;
+        let len = buffer.read_u32()?;
+        let bytes = buffer.read_bytes(len.into_usize_safe())?;
         Ok(Attribute {
             name,
             bytes: Vec::from(bytes),

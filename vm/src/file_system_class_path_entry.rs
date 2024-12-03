@@ -42,7 +42,6 @@ pub struct InvalidDirectoryError {
     path: String,
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;

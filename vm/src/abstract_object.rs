@@ -384,7 +384,6 @@ pub fn string_from_char_array(array: AbstractObject) -> Result<String, VmError> 
 
     let len = array.len().into_usize_safe();
     let mut string_chars: Vec<u16> = Vec::with_capacity(len);
-
     unsafe {
         let ptr = array.data.add(ALLOC_HEADER_SIZE + ARRAY_HEADER_SIZE) as *const i64;
         for i in 0..len {

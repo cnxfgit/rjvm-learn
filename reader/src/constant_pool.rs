@@ -42,7 +42,7 @@ impl InvalidConstantPoolIndexError {
 
 impl ConstantPool {
 
-    fn new() -> ConstantPool {
+    pub fn new() -> ConstantPool {
         Default::default()
     }
 
@@ -51,11 +51,11 @@ impl ConstantPool {
             &entry,
             ConstantPoolEntry::Long(_) | ConstantPoolEntry::Double(_)
         );
-
         self.entries.push(ConstantPoolPhysicalEntry::Entry(entry));
 
         if add_tombstone {
-            self.entries.push(ConstantPoolPhysicalEntry::MultiByteEntryTombstone());
+            self.entries
+                .push(ConstantPoolPhysicalEntry::MultiByteEntryTombstone())
         }
     }
 
@@ -133,7 +133,6 @@ impl ConstantPool {
 
     pub fn text_of(&self, idx: u16) -> Result<String, InvalidConstantPoolIndexError> {
         let entry = self.get(idx)?;
-
         let text = match entry {
             ConstantPoolEntry::Utf8(ref s) => s.clone(),
             ConstantPoolEntry::Integer(n) => n.to_string(),
@@ -145,17 +144,16 @@ impl ConstantPool {
             ConstantPoolEntry::FieldReference(i, j) => {
                 format!("{}.{}", self.text_of(*i)?, self.text_of(*j)?)
             }
-            ConstantPoolEntry::MethodReference(i,j ) => {
-                format!("{}.{}", self.text_of(*i)?, self.text_of(*j)?) 
+            ConstantPoolEntry::MethodReference(i, j) => {
+                format!("{}.{}", self.text_of(*i)?, self.text_of(*j)?)
             }
-            ConstantPoolEntry::InterfaceMethodReference(i,j ) => {
-                format!("{}.{}", self.text_of(*i)?, self.text_of(*j)?) 
+            ConstantPoolEntry::InterfaceMethodReference(i, j) => {
+                format!("{}.{}", self.text_of(*i)?, self.text_of(*j)?)
             }
-            ConstantPoolEntry::NameAndTypeDescriptor(i,j ) => {
-                format!("{}: {}", self.text_of(*i)?, self.text_of(*j)?) 
+            ConstantPoolEntry::NameAndTypeDescriptor(i, j) => {
+                format!("{}: {}", self.text_of(*i)?, self.text_of(*j)?)
             }
         };
-
         Ok(text)
     }
 }

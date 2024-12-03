@@ -119,11 +119,9 @@ impl<'a> ClassManager<'a> {
         if let Some(superclass_name) = &class_file.superclass {
             self.resolve_and_collect_class(superclass_name, &mut resolved_classes)?;
         }
-
         for interface_name in class_file.interfaces.iter() {
             self.resolve_and_collect_class(interface_name, &mut resolved_classes)?;
         }
-
         Ok(resolved_classes)
     }
 
@@ -159,7 +157,7 @@ impl<'a> ClassManager<'a> {
         for resolved_class in referenced_classes.values() {
             if let ResolvedClass::NewClass(new_class) = resolved_class {
                 for to_initialize in new_class.to_initialize.iter() {
-                    classes_to_init.push(to_initialize);
+                    classes_to_init.push(to_initialize)
                 }
             }
         }
@@ -199,7 +197,6 @@ impl<'a> ClassManager<'a> {
             Some(superclass) => superclass.num_total_fields,
             None => 0,
         };
-
         let num_this_class_fields = class_file.fields.len();
 
         Ok(Class {
@@ -212,8 +209,8 @@ impl<'a> ClassManager<'a> {
             interfaces,
             fields: class_file.fields,
             methods: class_file.methods,
-            first_field_index: num_superclass_fields + num_this_class_fields,
-            num_total_fields: num_superclass_fields,
+            num_total_fields: num_superclass_fields + num_this_class_fields,
+            first_field_index: num_superclass_fields,
         })
     }
 

@@ -56,6 +56,7 @@ impl<'a> Value<'a> {
                 FieldType::Base(base_type) => base_type == BaseType::Double,
                 _ => false,
             },
+
             Value::Object(object) => {
                 if object.kind() == ObjectKind::Array {
                     match expected_type {
@@ -88,6 +89,7 @@ impl<'a> Value<'a> {
                     }
                 }
             }
+
             Value::Null => match expected_type {
                 FieldType::Base(_) => false,
                 FieldType::Object(_) => true,
@@ -156,4 +158,5 @@ pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
         Err(VmError::ValidationException)
     }
 }
+
 

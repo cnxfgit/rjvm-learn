@@ -22,6 +22,7 @@ pub fn new_java_lang_string_object<'a>(
         .encode_utf16()
         .map(|c| Value::Int(c as i32))
         .collect();
+
     let java_array = vm.new_array(ArrayEntryType::Base(BaseType::Char), char_array.len());
     char_array
         .into_iter()
@@ -35,6 +36,7 @@ pub fn new_java_lang_string_object<'a>(
     Ok(string_object)
 }
 
+/// Given an instance of `java.lang.String`, extracts the content as a Rust `String`
 pub fn extract_str_from_java_lang_string<'a>(
     vm: &Vm<'a>,
     object: &impl Object<'a>,
@@ -54,9 +56,9 @@ pub fn new_java_lang_class_object<'a>(
     class_name: &str,
 ) -> Result<AbstractObject<'a>, MethodCallFailed<'a>> {
     let class_object = vm.new_object(call_stack, "java/lang/Class")?;
+    // TODO: build a proper instance of Class object
     let string_object = new_java_lang_string_object(vm, call_stack, class_name)?;
     class_object.set_field(5, Value::Object(string_object));
-
     Ok(class_object)
 }
 
@@ -73,10 +75,10 @@ pub fn new_java_lang_stack_trace_element_object<'a>(
     let method_name = Value::Object(new_java_lang_string_object(
         vm,
         call_stack,
-        &stack_trace_element.method_name,
+        stack_trace_element.method_name,
     )?);
     let file_name = match stack_trace_element.source_file {
-        Some(file_name) => Value::Object(new_java_lang_string_object(vm, call_stack, &file_name)?),
+        Some(file_name) => Value::Object(new_java_lang_string_object(vm, call_stack, file_name)?),
         _ => Value::Null,
     };
     let line_number = Value::Int(stack_trace_element.line_number.unwrap_or(LineNumber(0)).0 as i32);

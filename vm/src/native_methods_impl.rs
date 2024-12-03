@@ -111,7 +111,7 @@ fn register_throwable_methods(registry: &mut NativeMethodsRegistry) {
         "java/lang/Throwable",
         "fillInStackTrace",
         "(I)Ljava/lang/Throwable;",
-        |vm, stack, receiver, _| fill_in_stack_trace(vm, stack, receiver),
+        |vm, call_stack, receiver, _| fill_in_stack_trace(vm, call_stack, receiver),
     );
     registry.register(
         "java/lang/Throwable",
@@ -150,11 +150,13 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
 }
 
 fn identity_hash_code(args: Vec<Value<'_>>) -> MethodCallResult<'_> {
-    let obeject = expect_abstract_object_at(&args, 0)?;
-    Ok(Some(Value::Int(obeject.identity_hash_code())))
+    let object = expect_abstract_object_at(&args, 0)?;
+    Ok(Some(Value::Int(object.identity_hash_code())))
 }
 
 fn native_array_copy(args: Vec<Value>) -> MethodCallResult {
+    // TODO: handle NullPointerException with the correct error
+
     let src = expect_array_at(&args, 0)?;
     let src_pos = expect_int_at(&args, 1)?;
     let dest = expect_array_at(&args, 2)?;
@@ -201,6 +203,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
 fn get_class_loader(receiver: Option<AbstractObject>) -> MethodCallResult {
     debug!("invoked get class loader for object {:?}", receiver);
 
+    // It seems ok to return just null for the moment
     Ok(Some(Value::Null))
 }
 

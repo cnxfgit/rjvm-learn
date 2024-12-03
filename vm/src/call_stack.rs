@@ -46,7 +46,7 @@ impl<'a> CallStack<'a> {
     ) -> Result<CallFrameReference<'a>, VmError> {
         Self::check_receiver(&class_and_method, receiver.clone())?;
         let code = Self::get_code(&class_and_method)?;
-        let locals = Self::prepare_loacls(code, receiver, args);
+        let locals = Self::prepare_locals(code, receiver, args);
         let new_frame = self
             .allocator
             .alloc(CallFrame::new(class_and_method, locals));
@@ -58,7 +58,7 @@ impl<'a> CallStack<'a> {
 
     fn check_receiver(
         class_and_method: &ClassAndMethod,
-        receiver: Option<AbstractObject<'a>>,
+        receiver: Option<AbstractObject>,
     ) -> Result<(), VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
@@ -67,7 +67,6 @@ impl<'a> CallStack<'a> {
         } else if receiver.is_none() {
             return Err(VmError::NullPointerException);
         }
-
         Ok(())
     }
 
@@ -76,13 +75,13 @@ impl<'a> CallStack<'a> {
     ) -> Result<&'b ClassFileMethodCode, VmError> {
         if class_and_method.is_native() {
             return Err(VmError::NotImplemented);
-        }
+        };
 
         let code = &class_and_method.method.code.as_ref().unwrap();
         Ok(code)
     }
 
-    fn prepare_loacls(
+    fn prepare_locals(
         code: &ClassFileMethodCode,
         receiver: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
@@ -95,7 +94,6 @@ impl<'a> CallStack<'a> {
         while locals.len() < code.max_locals.into_usize_safe() {
             locals.push(Value::Uninitialized);
         }
-
         locals
     }
 

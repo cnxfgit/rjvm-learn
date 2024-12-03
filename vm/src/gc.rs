@@ -36,7 +36,6 @@ impl MemoryChunk {
     fn new(capacity: usize) -> Self {
         let layout = Layout::from_size_align(capacity, 8).unwrap();
         let ptr = unsafe { std::alloc::alloc_zeroed(layout) };
-
         debug!(
             "allocated memory chunk of size {} at {:#0x}",
             capacity, ptr as u64
@@ -57,7 +56,6 @@ impl MemoryChunk {
         assert_eq!(required_size % 8, 0);
 
         let ptr = unsafe { self.memory.add(self.used) };
-
         self.used += required_size;
 
         Some(AllocEntry {
@@ -86,7 +84,7 @@ pub struct ObjectAllocator<'a> {
 }
 
 impl<'a> ObjectAllocator<'a> {
-    pub fn with_maximun_memory(max_size: usize) -> Self {
+    pub fn with_maximum_memory(max_size: usize) -> Self {
         let semi_space_capacity = max_size / 2;
         Self {
             current: MemoryChunk::new(semi_space_capacity),
@@ -127,7 +125,6 @@ impl<'a> ObjectAllocator<'a> {
         for root in roots.iter() {
             self.visit(*root, class_resolver)?;
         }
-
         self.fix_references_in_new_region(class_resolver)?;
         for root in roots {
             self.fix_gc_root(root);
@@ -175,12 +172,14 @@ impl<'a> ObjectAllocator<'a> {
                     })
                     .expect("should have enough space in the other region");
 
-                std::ptr::write(
+            std::ptr::write(
                     referred_object_ptr.add(ALLOC_HEADER_SIZE) as *mut *mut u8,
                     new_address,
                 );
             }
-            GcState::Marked => {}
+
+            GcState::Marked => {
+            }
         }
 
         Ok(())
@@ -215,7 +214,6 @@ impl<'a> ObjectAllocator<'a> {
             let field_object_ptr = field_value_ptr as *mut AbstractObject;
             self.visit(field_object_ptr, class_resolver)?;
         }
-
         Ok(())
     }
 
@@ -225,7 +223,9 @@ impl<'a> ObjectAllocator<'a> {
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
         match array.elements_type() {
-            ArrayEntryType::Base(_) => Ok(()),
+            ArrayEntryType::Base(_) => {
+                Ok(())
+            }
             ArrayEntryType::Object(_) => {
                 for i in 0..array.len().into_usize_safe() {
                     let value = array.get_element(i);
@@ -265,12 +265,11 @@ impl<'a> ObjectAllocator<'a> {
             header.set_state(GcState::Unmarked);
             ptr = ptr.add(header.size());
         }
-
         Ok(())
     }
 
     unsafe fn fix_references_in_object(
-        &mut self,
+        &self,
         object: AbstractObject<'a>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
@@ -298,7 +297,6 @@ impl<'a> ObjectAllocator<'a> {
                 field.name, field_value_ptr as u64, new_address as u64
             );
         }
-
         Ok(())
     }
 
